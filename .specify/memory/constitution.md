@@ -1,24 +1,16 @@
 <!--
 Sync Impact Report
 ==================
-- Version change: N/A → 1.0.0 (initial creation)
-- Added principles:
-  - I. UI/UX 우선 (User Experience First)
-  - II. API 문서화 (Swagger/OpenAPI)
-  - III. CRUD 패턴 일관성 (CRUD Pattern Consistency)
-  - IV. 인증 및 보안 (Authentication & Security)
-  - V. 코드 구조 및 품질 (Code Structure & Quality)
-  - VI. 상태 관리 및 데이터 패턴 (State & Data Patterns)
-  - VII. 에러 처리 및 로딩 (Error Handling & Loading States)
-  - VIII. 성능 기준 (Performance Standards)
-- Added sections:
-  - Technology Stack
-  - Development Workflow
-  - Governance
+- Version change: 1.0.0 → 1.1.0 (MINOR — 기존 원칙에 새 규칙 추가)
+- Modified principles:
+  - I. UI/UX 우선: 한국어 기본 언어 규칙 추가
+    (html lang="ko", UI 텍스트 한국어 작성, 다국어 시 한국어 fallback)
+- Added sections: 없음
+- Removed sections: 없음
 - Templates requiring updates:
-  - plan-template.md — ✅ No changes needed
-  - spec-template.md — ✅ No changes needed
-  - tasks-template.md — ✅ No changes needed
+  - plan-template.md — ✅ 변경 불필요
+  - spec-template.md — ✅ 변경 불필요
+  - tasks-template.md — ✅ 변경 불필요
 - Deferred items:
   - TODO(DATABASE): 데이터베이스 선택 추후 결정
   - TODO(ORM): ORM 선택 추후 결정
@@ -39,6 +31,11 @@ Sync Impact Report
 - 접근성(Accessibility) WCAG 2.1 AA 기준을 준수한다
 - 다크 모드는 초기 버전에서 제외하며, 라이트 모드를
   기본으로 한다
+- 웹페이지의 기본 언어는 한국어(ko)로 설정한다:
+  - `<html lang="ko">` 속성을 반드시 명시해야 한다
+  - UI 텍스트, 레이블, 안내 메시지는 한국어로 작성한다
+  - 다국어 지원이 필요한 경우 한국어를 기본(fallback)으로
+    유지한다
 
 ### II. API 문서화 (Swagger/OpenAPI)
 
@@ -172,4 +169,4 @@ Sync Impact Report
   - MINOR: 새로운 원칙 또는 섹션 추가
   - PATCH: 문구 수정, 오탈자, 비의미적 개선
 
-**Version**: 1.0.0 | **Ratified**: 2026-02-24 | **Last Amended**: 2026-02-24
+**Version**: 1.1.0 | **Ratified**: 2026-02-24 | **Last Amended**: 2026-03-03

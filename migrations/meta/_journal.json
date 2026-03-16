@@ -1,0 +1,62 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1772514874290,
+      "tag": "0000_tidy_shen",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1772523892281,
+      "tag": "0001_famous_magneto",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1773627565401,
+      "tag": "0002_aromatic_titanium_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1773632366712,
+      "tag": "0003_strong_violations",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1773633161837,
+      "tag": "0004_typical_annihilus",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1773639336199,
+      "tag": "0005_moaning_bromley",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1773645503700,
+      "tag": "0006_nasty_romulus",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1773649484815,
+      "tag": "0007_lucky_purple_man",
+      "breakpoints": true
+    }
+  ]
+}
