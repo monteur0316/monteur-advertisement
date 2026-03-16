@@ -12,6 +12,7 @@ import {
   createOrgHierarchy,
   isAncestorOf,
   getAllOrgs,
+  deleteOrgHierarchy,
 } from "@/src/db/queries/organization-hierarchy"
 
 type ApiResponse<T> = {
@@ -300,6 +301,7 @@ export async function getChildOrgAccounts(): Promise<
       orgName: string
       orgSlug: string
       orgType: OrgType
+      parentOrgId: string | null
       parentOrgName: string | null
       userId: string
       username: string
@@ -350,52 +352,62 @@ export async function getChildOrgAccounts(): Promise<
       }
     }
 
-    const accounts = await Promise.all(
+    const results = await Promise.all(
       targetOrgs.map(async (hierarchy) => {
-        const org = await client.organizations.getOrganization({
-          organizationId: hierarchy.clerkOrgId,
-        })
-
-        const memberships =
-          await client.organizations.getOrganizationMembershipList({
+        try {
+          const org = await client.organizations.getOrganization({
             organizationId: hierarchy.clerkOrgId,
           })
 
-        const adminMembership = memberships.data[0]
-        let username = ""
-        let firstName: string | null = null
-        let password = ""
+          const memberships =
+            await client.organizations.getOrganizationMembershipList({
+              organizationId: hierarchy.clerkOrgId,
+            })
 
-        if (adminMembership?.publicUserData?.userId) {
-          const user = await client.users.getUser(
-            adminMembership.publicUserData.userId
-          )
-          username = user.username ?? ""
-          firstName = user.firstName
-          password = (user.privateMetadata as { initialPassword?: string })?.initialPassword ?? ""
-        }
+          const adminMembership = memberships.data[0]
+          let username = ""
+          let firstName: string | null = null
+          let password = ""
 
-        return {
-          orgId: hierarchy.clerkOrgId,
-          orgName: org.name,
-          orgSlug: org.slug ?? "",
-          orgType: hierarchy.orgType as OrgType,
-          parentOrgName: hierarchy.parentClerkOrgId
-            ? parentOrgNames.get(hierarchy.parentClerkOrgId) ?? null
-            : null,
-          userId: adminMembership?.publicUserData?.userId ?? "",
-          username,
-          password,
-          firstName,
-          adQuantity: hierarchy.adQuantity ?? 0,
-          memo: hierarchy.memo ?? null,
-          createdAt: org.createdAt,
+          if (adminMembership?.publicUserData?.userId) {
+            const user = await client.users.getUser(
+              adminMembership.publicUserData.userId
+            )
+            username = user.username ?? ""
+            firstName = user.firstName
+            password = (user.privateMetadata as { initialPassword?: string })?.initialPassword ?? ""
+          }
+
+          return {
+            orgId: hierarchy.clerkOrgId,
+            orgName: org.name,
+            orgSlug: org.slug ?? "",
+            orgType: hierarchy.orgType as OrgType,
+            parentOrgId: hierarchy.parentClerkOrgId ?? null,
+            parentOrgName: hierarchy.parentClerkOrgId
+              ? parentOrgNames.get(hierarchy.parentClerkOrgId) ?? null
+              : null,
+            userId: adminMembership?.publicUserData?.userId ?? "",
+            username,
+            password,
+            firstName,
+            adQuantity: hierarchy.adQuantity ?? 0,
+            memo: hierarchy.memo ?? null,
+            createdAt: org.createdAt,
+          }
+        } catch {
+          // Clerk에서 삭제된 조직은 DB에서도 정리
+          console.warn(`[getChildOrgAccounts] Cleaning up orphaned org ${hierarchy.clerkOrgId}`)
+          await deleteOrgHierarchy(hierarchy.clerkOrgId)
+          return null
         }
       })
     )
+    const accounts = results.filter((a) => a !== null)
 
     return { data: { accounts }, error: null, message: null }
-  } catch {
+  } catch (err) {
+    console.error("[getChildOrgAccounts] Error:", err)
     return {
       data: null,
       error: "INTERNAL_ERROR",

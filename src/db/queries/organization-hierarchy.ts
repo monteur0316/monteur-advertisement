@@ -101,3 +101,9 @@ export async function getOrgsByType(orgType: OrgType) {
 export async function getAllOrgs() {
   return db.select().from(organizationHierarchy)
 }
+
+export async function deleteOrgHierarchy(clerkOrgId: string) {
+  return db
+    .delete(organizationHierarchy)
+    .where(eq(organizationHierarchy.clerkOrgId, clerkOrgId))
+}
