@@ -56,25 +56,35 @@ export async function getSettlements(input: {
     return { data: null, error: "UNAUTHORIZED", message: "인증이 필요합니다" }
   }
 
-  const isSameOrg = ctx.orgId === input.orgId
-  const isAncestor =
-    !isSameOrg && (await isAncestorOf(ctx.orgId, input.orgId))
+  if (!ctx.isMaster) {
+    const isSameOrg = ctx.orgId === input.orgId
+    const isAncestor =
+      !isSameOrg && (await isAncestorOf(ctx.orgId, input.orgId))
 
-  if (!isSameOrg && !isAncestor) {
-    return { data: null, error: "FORBIDDEN", message: "권한이 없습니다" }
+    if (!isSameOrg && !isAncestor) {
+      return { data: null, error: "FORBIDDEN", message: "권한이 없습니다" }
+    }
   }
 
   try {
-    const descendantIds = await getDescendantOrgIds(input.orgId)
-    const orgIds = [input.orgId, ...descendantIds]
-
-    const orgFilter = inArray(settlements.orgId, orgIds)
+    // 마스터: 전체 정산 조회, 비마스터: 자신 + 하위 조직만
+    let orgFilter
+    if (ctx.isMaster) {
+      orgFilter = undefined
+    } else {
+      const descendantIds = await getDescendantOrgIds(input.orgId)
+      const orgIds = [input.orgId, ...descendantIds]
+      orgFilter = inArray(settlements.orgId, orgIds)
+    }
 
     let query = db
       .select()
       .from(settlements)
-      .where(orgFilter)
       .orderBy(desc(settlements.createdAt))
+
+    if (orgFilter) {
+      query = query.where(orgFilter) as typeof query
+    }
 
     if (input.limit) {
       const page = input.page ?? 1
@@ -82,9 +92,13 @@ export async function getSettlements(input: {
       query = query.limit(input.limit).offset(offset) as typeof query
     }
 
+    const countQuery = orgFilter
+      ? db.select({ count: count() }).from(settlements).where(orgFilter)
+      : db.select({ count: count() }).from(settlements)
+
     const [rows, totalResult] = await Promise.all([
       query,
-      db.select({ count: count() }).from(settlements).where(orgFilter),
+      countQuery,
     ])
 
     const result: SettlementRecord[] = rows.map((row) => ({
@@ -230,13 +244,15 @@ export async function updateSettlementStatus(input: {
       return { data: null, error: "NOT_FOUND", message: "정산을 찾을 수 없습니다" }
     }
 
-    // 권한 확인
-    const isSameOrg = ctx.orgId === existing.orgId
-    const isAncestor =
-      !isSameOrg && (await isAncestorOf(ctx.orgId, existing.orgId))
+    // 권한 확인 (마스터는 전체 접근)
+    if (!ctx.isMaster) {
+      const isSameOrg = ctx.orgId === existing.orgId
+      const isAncestor =
+        !isSameOrg && (await isAncestorOf(ctx.orgId, existing.orgId))
 
-    if (!isSameOrg && !isAncestor) {
-      return { data: null, error: "FORBIDDEN", message: "권한이 없습니다" }
+      if (!isSameOrg && !isAncestor) {
+        return { data: null, error: "FORBIDDEN", message: "권한이 없습니다" }
+      }
     }
 
     await db
@@ -289,12 +305,14 @@ export async function getSettlementLogs(input: {
     return { data: null, error: "UNAUTHORIZED", message: "인증이 필요합니다" }
   }
 
-  const isSameOrg = ctx.orgId === input.orgId
-  const isAncestor =
-    !isSameOrg && (await isAncestorOf(ctx.orgId, input.orgId))
+  if (!ctx.isMaster) {
+    const isSameOrg = ctx.orgId === input.orgId
+    const isAncestor =
+      !isSameOrg && (await isAncestorOf(ctx.orgId, input.orgId))
 
-  if (!isSameOrg && !isAncestor) {
-    return { data: null, error: "FORBIDDEN", message: "권한이 없습니다" }
+    if (!isSameOrg && !isAncestor) {
+      return { data: null, error: "FORBIDDEN", message: "권한이 없습니다" }
+    }
   }
 
   try {
@@ -350,12 +368,14 @@ export async function extendSettlement(input: {
       return { data: null, error: "NOT_FOUND", message: "정산을 찾을 수 없습니다" }
     }
 
-    const isSameOrg = ctx.orgId === existing.orgId
-    const isAncestor =
-      !isSameOrg && (await isAncestorOf(ctx.orgId, existing.orgId))
+    if (!ctx.isMaster) {
+      const isSameOrg = ctx.orgId === existing.orgId
+      const isAncestor =
+        !isSameOrg && (await isAncestorOf(ctx.orgId, existing.orgId))
 
-    if (!isSameOrg && !isAncestor) {
-      return { data: null, error: "FORBIDDEN", message: "권한이 없습니다" }
+      if (!isSameOrg && !isAncestor) {
+        return { data: null, error: "FORBIDDEN", message: "권한이 없습니다" }
+      }
     }
 
     await db

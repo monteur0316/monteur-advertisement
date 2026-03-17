@@ -320,25 +320,90 @@ export async function getChildOrgAccounts(): Promise<
   }
 
   try {
-    // Master sees all descendants, others see direct children only
-    let targetOrgs: Awaited<ReturnType<typeof getChildOrgs>>
+    const client = await clerkClient()
+
     if (ctx.isMaster) {
-      const descendantIds = await getDescendantOrgIds(ctx.orgId)
-      if (descendantIds.length === 0) {
+      // 마스터: Clerk API에서 전체 조직을 가져와서 마스터 org 제외
+      const response = await client.organizations.getOrganizationList({ limit: 100 })
+      const nonMasterOrgs = response.data.filter((org) => {
+        const meta = org.publicMetadata as Record<string, unknown> | undefined
+        return meta?.orgType !== "master"
+      })
+
+      if (nonMasterOrgs.length === 0) {
         return { data: { accounts: [] }, error: null, message: null }
       }
-      // Fetch hierarchy records for all descendants
-      const allOrgs = await getAllOrgs()
-      targetOrgs = allOrgs.filter((o) => descendantIds.includes(o.clerkOrgId))
-    } else {
-      targetOrgs = await getChildOrgs(ctx.orgId)
+
+      // hierarchy DB에서 추가 정보 조회 (있으면)
+      const allHierarchy = await getAllOrgs()
+      const hierarchyMap = new Map(allHierarchy.map((h) => [h.clerkOrgId, h]))
+
+      const results = await Promise.all(
+        nonMasterOrgs.map(async (org) => {
+          try {
+            const hierarchy = hierarchyMap.get(org.id)
+            const meta = org.publicMetadata as Record<string, unknown> | undefined
+            const orgType = (hierarchy?.orgType ?? meta?.orgType ?? "advertiser") as OrgType
+
+            const memberships = await client.organizations.getOrganizationMembershipList({
+              organizationId: org.id,
+            })
+
+            const adminMembership = memberships.data[0]
+            let username = ""
+            let firstName: string | null = null
+            let password = ""
+
+            if (adminMembership?.publicUserData?.userId) {
+              const user = await client.users.getUser(adminMembership.publicUserData.userId)
+              username = user.username ?? ""
+              firstName = user.firstName
+              password = (user.privateMetadata as { initialPassword?: string })?.initialPassword ?? ""
+            }
+
+            // 부모 조직 이름 조회
+            let parentOrgId: string | null = hierarchy?.parentClerkOrgId ?? null
+            let parentOrgName: string | null = null
+            if (parentOrgId) {
+              try {
+                const parentOrg = await client.organizations.getOrganization({ organizationId: parentOrgId })
+                parentOrgName = parentOrg.name
+              } catch {
+                parentOrgName = "-"
+              }
+            }
+
+            return {
+              orgId: org.id,
+              orgName: org.name,
+              orgSlug: org.slug ?? "",
+              orgType,
+              parentOrgId,
+              parentOrgName,
+              userId: adminMembership?.publicUserData?.userId ?? "",
+              username,
+              password,
+              firstName,
+              adQuantity: hierarchy?.adQuantity ?? 0,
+              memo: hierarchy?.memo ?? null,
+              createdAt: org.createdAt,
+            }
+          } catch {
+            return null
+          }
+        })
+      )
+
+      const accounts = results.filter((a) => a !== null)
+      return { data: { accounts }, error: null, message: null }
     }
+
+    // 비마스터: hierarchy 기반으로 직접 하위 조직만 조회
+    const targetOrgs = await getChildOrgs(ctx.orgId)
 
     if (targetOrgs.length === 0) {
       return { data: { accounts: [] }, error: null, message: null }
     }
-
-    const client = await clerkClient()
 
     // Build parent org name lookup
     const parentOrgIds = [...new Set(targetOrgs.map((o) => o.parentClerkOrgId).filter(Boolean))] as string[]
@@ -396,7 +461,6 @@ export async function getChildOrgAccounts(): Promise<
             createdAt: org.createdAt,
           }
         } catch {
-          // Clerk에서 삭제된 조직은 DB에서도 정리
           console.warn(`[getChildOrgAccounts] Cleaning up orphaned org ${hierarchy.clerkOrgId}`)
           await deleteOrgHierarchy(hierarchy.clerkOrgId)
           return null

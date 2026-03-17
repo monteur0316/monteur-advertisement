@@ -1,6 +1,6 @@
-import { auth } from "@clerk/nextjs/server"
+import { auth, clerkClient } from "@clerk/nextjs/server"
 import type { OrgType } from "@/src/types/globals"
-import { isAncestorOf } from "@/src/db/queries/organization-hierarchy"
+import { isAncestorOf, getOrgHierarchy } from "@/src/db/queries/organization-hierarchy"
 
 /** Clerk JWT may serialize booleans as strings */
 export function isTruthy(value: unknown): boolean {
@@ -18,7 +18,26 @@ export interface AuthContext {
 
 export async function getAuthContext(): Promise<AuthContext> {
   const { userId, orgId, orgSlug, sessionClaims } = await auth()
-  const orgType = (sessionClaims?.orgType as OrgType) ?? null
+  let orgType = (sessionClaims?.orgType as OrgType) ?? null
+
+  // 세션 클레임에 orgType이 없으면 DB → Clerk publicMetadata 순서로 조회
+  if (!orgType && orgId) {
+    const hierarchy = await getOrgHierarchy(orgId)
+    if (hierarchy) {
+      orgType = hierarchy.orgType as OrgType
+    } else {
+      try {
+        const client = await clerkClient()
+        const org = await client.organizations.getOrganization({ organizationId: orgId })
+        const metaType = (org.publicMetadata as Record<string, unknown>)?.orgType as OrgType | undefined
+        if (metaType) {
+          orgType = metaType
+        }
+      } catch {
+        // Clerk 조회 실패 시 무시
+      }
+    }
+  }
 
   return {
     userId,

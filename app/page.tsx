@@ -30,9 +30,6 @@ export default async function Home() {
           <Button asChild variant="outline">
             <Link href="/sign-in">로그인</Link>
           </Button>
-          <Button asChild>
-            <Link href="/sign-up">회원가입</Link>
-          </Button>
         </div>
       </main>
     </>

@@ -1,4 +1,3 @@
-import { auth } from "@clerk/nextjs/server"
 import { redirect } from "next/navigation"
 import {
   SidebarProvider,
@@ -6,25 +5,24 @@ import {
 } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/src/components/app-sidebar"
 import { MobileHeader } from "@/src/components/mobile-header"
-import type { OrgType } from "@/src/types/globals"
 import {
   getOrgNavigationGroups,
   filterNavigationByAccess,
 } from "@/src/lib/navigation"
+import { getAuthContext } from "@/src/lib/auth"
 
 export default async function ProtectedLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const { userId, orgId, orgSlug, sessionClaims } = await auth()
+  const ctx = await getAuthContext()
 
-  if (!userId) {
+  if (!ctx.userId) {
     redirect("/sign-in")
   }
 
-  const orgType = (sessionClaims?.orgType as OrgType) ?? null
-  const isMaster = orgType === "master"
+  const { orgId, orgSlug, orgType, isMaster } = ctx
 
   const allGroups = [
     ...(orgSlug ? getOrgNavigationGroups(orgSlug) : []),

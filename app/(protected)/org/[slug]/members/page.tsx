@@ -19,7 +19,7 @@ export default async function OrgMembersPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold">하위 계정</h1>
+          <h1 className="text-2xl font-bold">계정 관리</h1>
           <p className="text-sm text-muted-foreground">
             하위 조직과 계정을 관리합니다.
           </p>

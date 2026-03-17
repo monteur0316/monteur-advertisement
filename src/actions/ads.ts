@@ -3,12 +3,9 @@
 import { db } from "@/src/db"
 import { ads } from "@/src/db/schema/ads"
 import type { Ad } from "@/src/db/schema/ads"
-import { eq, and, desc, count, inArray } from "drizzle-orm"
+import { eq, and, desc, count } from "drizzle-orm"
 import { getAuthContext } from "@/src/lib/auth"
-import {
-  isAncestorOf,
-  getDescendantOrgIds,
-} from "@/src/db/queries/organization-hierarchy"
+import { isAncestorOf } from "@/src/db/queries/organization-hierarchy"
 import {
   createAdSchema,
   updateAdSchema,
@@ -34,31 +31,31 @@ export async function getAds(input: {
     return { data: null, error: "UNAUTHORIZED", message: "인증이 필요합니다" }
   }
 
-  const isSameOrg = ctx.orgId === input.orgId
-  const isAncestor =
-    !isSameOrg && (await isAncestorOf(ctx.orgId, input.orgId))
+  if (!ctx.isMaster) {
+    const isSameOrg = ctx.orgId === input.orgId
+    const isAncestor =
+      !isSameOrg && (await isAncestorOf(ctx.orgId, input.orgId))
 
-  if (!isSameOrg && !isAncestor) {
-    return { data: null, error: "FORBIDDEN", message: "권한이 없습니다" }
+    if (!isSameOrg && !isAncestor) {
+      return { data: null, error: "FORBIDDEN", message: "권한이 없습니다" }
+    }
   }
 
   try {
-    // 마스터: 자신 + 모든 하위 조직 광고 조회
+    // 마스터: 전체 광고 조회
     // 비마스터: 요청한 orgId 광고만 조회
-    let orgFilter
-    if (ctx.isMaster) {
-      const descendantIds = await getDescendantOrgIds(ctx.orgId)
-      const allOrgIds = [ctx.orgId, ...descendantIds]
-      orgFilter = inArray(ads.orgId, allOrgIds)
-    } else {
-      orgFilter = eq(ads.orgId, input.orgId)
-    }
+    const orgFilter = ctx.isMaster
+      ? undefined
+      : eq(ads.orgId, input.orgId)
 
     let query = db
       .select()
       .from(ads)
-      .where(orgFilter)
       .orderBy(desc(ads.createdAt))
+
+    if (orgFilter) {
+      query = query.where(orgFilter) as typeof query
+    }
 
     if (input.limit) {
       const page = input.page ?? 1
@@ -66,9 +63,13 @@ export async function getAds(input: {
       query = query.limit(input.limit).offset(offset) as typeof query
     }
 
+    const countQuery = orgFilter
+      ? db.select({ count: count() }).from(ads).where(orgFilter)
+      : db.select({ count: count() }).from(ads)
+
     const [rows, totalResult] = await Promise.all([
       query,
-      db.select({ count: count() }).from(ads).where(orgFilter),
+      countQuery,
     ])
 
     return {
@@ -96,12 +97,14 @@ export async function getAd(input: {
     return { data: null, error: "UNAUTHORIZED", message: "인증이 필요합니다" }
   }
 
-  const isSameOrg = ctx.orgId === input.orgId
-  const isAncestor =
-    !isSameOrg && (await isAncestorOf(ctx.orgId, input.orgId))
+  if (!ctx.isMaster) {
+    const isSameOrg = ctx.orgId === input.orgId
+    const isAncestor =
+      !isSameOrg && (await isAncestorOf(ctx.orgId, input.orgId))
 
-  if (!isSameOrg && !isAncestor) {
-    return { data: null, error: "FORBIDDEN", message: "권한이 없습니다" }
+    if (!isSameOrg && !isAncestor) {
+      return { data: null, error: "FORBIDDEN", message: "권한이 없습니다" }
+    }
   }
 
   try {
